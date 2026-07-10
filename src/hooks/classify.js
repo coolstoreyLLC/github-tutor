@@ -403,4 +403,56 @@ function classify(command) {
   return null;
 }
 
-module.exports = { classify, classifySegment, tokenize, splitSegments };
+// ---------------------------------------------------------------------------
+// Per-command gating: the graduation path
+// ---------------------------------------------------------------------------
+//
+// Once the user is confident with a command, they ungate it and Claude runs it
+// normally again. The tutor should shrink as they learn.
+
+// Every key `classify()` can emit for git. gh keys are open-ended (`gh-<noun>-<verb>`)
+// so they are validated by shape instead.
+const GATEABLE_GIT = new Set([...GIT_GATED, ...Object.keys(GIT_CONDITIONAL)]);
+
+const GH_KEY_SHAPE = /^gh-[a-z]+(-[a-z-]+)?$/;
+
+// Accept what a human would plausibly type and return the internal key:
+//   "git push" / "push" / "PUSH"        -> "push"
+//   "gh pr create" / "gh-pr-create"     -> "gh-pr-create"
+//   "cherry pick"                       -> "cherry-pick"
+// Returns null when the input names nothing gateable.
+function canonicalKey(input) {
+  if (typeof input !== 'string') return null;
+
+  let s = input.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!s) return null;
+
+  if (s.startsWith('gh ') || s.startsWith('gh-')) {
+    const key = 'gh-' + s.slice(3).replace(/[\s-]+/g, '-');
+    return GH_KEY_SHAPE.test(key) ? key : null;
+  }
+
+  if (s.startsWith('git ')) s = s.slice(4);
+  const key = s.replace(/\s+/g, '-');
+
+  return GATEABLE_GIT.has(key) ? key : null;
+}
+
+function isGateable(key) {
+  return GATEABLE_GIT.has(key) || GH_KEY_SHAPE.test(key);
+}
+
+// Sorted, for help text and error messages.
+function gateableKeys() {
+  return [...GATEABLE_GIT].sort();
+}
+
+module.exports = {
+  classify,
+  classifySegment,
+  tokenize,
+  splitSegments,
+  canonicalKey,
+  isGateable,
+  gateableKeys,
+};

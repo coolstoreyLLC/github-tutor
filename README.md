@@ -61,11 +61,50 @@ It's on as soon as it's installed. Just work normally. The first time Claude tri
 | `/gh-tutor brief` | Tight lines, no filler. Danger warnings stay full |
 | `/gh-tutor classroom on` | Quiz before revealing commands you've already been taught |
 | `/gh-tutor classroom off` | No quizzes (default) |
-| `/gh-tutor reset` | Forget learned-command history |
+| `/gh-tutor ungate <command>` | You know this one. Claude runs it from now on |
+| `/gh-tutor gate <command>` | Put it back under instruction |
+| `/gh-tutor reset` | Back to defaults, re-gate everything |
 
 **In a rush? `/gh-tutor off`.** This matters more than it sounds. A learning tool you can't switch off is a tool you stop using. Turn it off, ship the thing, turn it back on tomorrow. State persists across sessions.
 
 You can also just say "turn off the github tutor" in plain English.
+
+## Graduating one command at a time
+
+The tutor is meant to shrink as you learn. Once `git push` is muscle memory, being walked through `-u` for the fortieth time is friction.
+
+```
+/gh-tutor ungate push
+```
+
+Claude runs `git push` normally from then on. Everything else stays gated. Changed your mind, or it's been a month?
+
+```
+/gh-tutor gate push
+```
+
+It accepts whatever you'd naturally type — `push`, `git push`, `gh pr create`, `CHERRY-PICK` — and rejects anything it doesn't gate, loudly, rather than silently doing nothing:
+
+```
+$ /gh-tutor ungate psuh
+"psuh" is not a command the tutor gates.
+
+Gateable git commands:
+  add am apply branch checkout cherry-pick clean clone commit config ...
+```
+
+Ungating something destructive tells you what you just handed over:
+
+```
+$ /gh-tutor ungate reset
+Ungated `reset`. Claude will now run it for you without explaining.
+
+Worth knowing what you just handed over: `git reset --hard` deletes
+uncommitted changes permanently. There is no undo, because that work
+was never committed. Commit or stash first, always.
+```
+
+Claude will suggest `ungate` on its own, but only for a command you've been taught before — never on first exposure, where an escape hatch would just teach you to skip the lesson.
 
 ## Classroom mode
 
@@ -105,7 +144,7 @@ Brief mode compresses the *prose*. It never compresses a danger warning and neve
 
 ## Configuration
 
-State lives at `~/.claude/.gh-tutor-state.json` and persists across sessions.
+State lives at `~/.claude/.gh-tutor-state.json` and persists across sessions — including which commands you've graduated from.
 
 A repo can ship a default in `.gh-tutor.json`:
 

@@ -83,9 +83,30 @@ The hook handles these; you do not need to act on them.
 | `/gh-tutor on` | Re-enable the gate |
 | `/gh-tutor brief` / `verbose` | Explanation depth |
 | `/gh-tutor classroom on` / `off` | Quizzes |
-| `/gh-tutor reset` | Forget learned-command history |
+| `/gh-tutor ungate <command>` | Graduate one command — Claude runs it from now on |
+| `/gh-tutor gate <command>` | Put one command back under instruction |
+| `/gh-tutor reset` | Back to defaults, re-gate everything |
 
 If the user sounds rushed or frustrated, remind them `/gh-tutor off` exists. The tutor is a choice they make, not a tax they pay. A learner who can't turn it off stops using it.
+
+## Graduation
+
+The tutor is supposed to shrink. Once someone has typed `git push` twenty times, stopping to explain `-u` is friction, not teaching.
+
+When a gated command comes up that the user has **already been taught**, and they say they know it or sound impatient with that specific command, tell them once:
+
+```
+/gh-tutor ungate push
+```
+
+From then on you run `git push` yourself, normally, no explanation. Everything else stays gated.
+
+Judgment, not reflex:
+
+- Never offer this the first time they meet a command. An escape hatch dangled at the start just teaches them to skip the lesson.
+- Mention it once. Repeating it every time reads as though you resent teaching.
+- If they ungate something destructive — `reset`, `clean`, `push` — the confirmation already tells them what they handed over. Don't relitigate it.
+- `/gh-tutor gate push` puts it back. Learning is not monotonic; nobody should feel they burned a bridge.
 
 ## Reference material
 

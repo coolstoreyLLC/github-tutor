@@ -20,6 +20,7 @@ const DEFAULTS = {
   verbosity: 'verbose', // 'verbose' | 'brief'
   classroom: false,
   taught: [], // verbs the user has already been walked through
+  ungated: [], // verbs the user has graduated from — Claude runs these normally
 };
 
 const VALID_VERBOSITY = ['verbose', 'brief'];
@@ -110,6 +111,9 @@ function normalize(raw) {
   if (!VALID_VERBOSITY.includes(s.verbosity)) s.verbosity = 'verbose';
   s.taught = Array.isArray(s.taught)
     ? s.taught.filter(v => typeof v === 'string').slice(0, 200)
+    : [];
+  s.ungated = Array.isArray(s.ungated)
+    ? s.ungated.filter(v => typeof v === 'string').slice(0, 200)
     : [];
   return s;
 }

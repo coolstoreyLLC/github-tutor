@@ -61,8 +61,12 @@ function denyReason(out) {
 
 function resetState(obj) {
   fs.writeFileSync(path.join(TMP, '.gh-tutor-state.json'), JSON.stringify({
-    enabled: true, verbosity: 'verbose', classroom: false, taught: [], pending: null, ...obj,
+    enabled: true, verbosity: 'verbose', classroom: false, taught: [], ungated: [], pending: null, ...obj,
   }));
+}
+
+function stateNow() {
+  return JSON.parse(fs.readFileSync(path.join(TMP, '.gh-tutor-state.json'), 'utf8'));
 }
 
 console.log('\n-- gate: allow paths produce NO output (never an explicit allow) --');
@@ -199,6 +203,80 @@ check('unrelated prompt passes through', unrelated === '');
 resetState();
 const ambiguous = run(TRACKER, { prompt: 'just do it' });
 check('ambiguous phrase does NOT disable the tutor', ambiguous === '');
+
+console.log('-- per-command gating: the graduation path --');
+resetState({ ungated: ['push'] });
+check('ungated command runs silently', gate('git push -u origin main') === '');
+check('but other commands stay gated', isDeny(gate('git commit -m x')));
+check('ungated does not leak to gh', isDeny(gate('gh pr create --title x')));
+
+resetState();
+const ung = JSON.parse(run(TRACKER, { prompt: '/gh-tutor ungate push' }));
+check('ungate confirms', /Ungated `push`/.test(ung.reason));
+check('ungate persists to state', stateNow().ungated.includes('push'));
+check('ungate takes effect immediately', gate('git push') === '');
+
+const already = JSON.parse(run(TRACKER, { prompt: '/gh-tutor ungate push' }));
+check('re-ungating is a no-op with a clear message', /already ungated/.test(already.reason));
+
+const reg = JSON.parse(run(TRACKER, { prompt: '/gh-tutor gate push' }));
+check('gate confirms', /Gated `push` again/.test(reg.reason));
+check('gate removes from state', !stateNow().ungated.includes('push'));
+check('gate takes effect immediately', isDeny(gate('git push', { prompt_id: 'rg' })));
+
+const alreadyGated = JSON.parse(run(TRACKER, { prompt: '/gh-tutor gate push' }));
+check('re-gating is a no-op with a clear message', /already gated/.test(alreadyGated.reason));
+
+console.log('-- ungate: input forms a human would actually type --');
+resetState();
+run(TRACKER, { prompt: '/gh-tutor ungate git push' });
+check('accepts "git push"', stateNow().ungated.includes('push'));
+
+resetState();
+run(TRACKER, { prompt: '/gh-tutor ungate gh pr create' });
+check('accepts "gh pr create"', stateNow().ungated.includes('gh-pr-create'), JSON.stringify(stateNow().ungated));
+check('ungated gh pr create runs', gate('gh pr create --title x') === '');
+
+resetState();
+run(TRACKER, { prompt: '/gh-tutor ungate CHERRY-PICK' });
+check('case insensitive', stateNow().ungated.includes('cherry-pick'));
+
+console.log('-- ungate: bad input is rejected loudly, not silently ignored --');
+resetState();
+const typo = JSON.parse(run(TRACKER, { prompt: '/gh-tutor ungate psuh' }));
+check('typo is rejected', /is not a command the tutor gates/.test(typo.reason));
+check('typo lists valid keys', /commit/.test(typo.reason) && /rebase/.test(typo.reason));
+check('typo changed nothing', stateNow().ungated.length === 0);
+
+resetState();
+const ro = JSON.parse(run(TRACKER, { prompt: '/gh-tutor ungate status' }));
+check('read-only command rejected with reason', /never gated/.test(ro.reason));
+
+resetState();
+const noArg = JSON.parse(run(TRACKER, { prompt: '/gh-tutor ungate' }));
+check('missing argument asks which command', /Which command/.test(noArg.reason));
+
+console.log('-- ungate: danger commands warn about what was handed over --');
+resetState();
+const dangerous = JSON.parse(run(TRACKER, { prompt: '/gh-tutor ungate reset' }));
+check('ungating reset surfaces its danger', /uncommitted changes permanently/.test(dangerous.reason));
+
+resetState();
+const safe = JSON.parse(run(TRACKER, { prompt: '/gh-tutor ungate fetch' }));
+check('ungating a safe command has no danger note', !/Worth knowing/.test(safe.reason));
+
+console.log('-- reset re-gates everything --');
+resetState({ ungated: ['push', 'commit'] });
+run(TRACKER, { prompt: '/gh-tutor reset' });
+check('reset clears ungated', stateNow().ungated.length === 0);
+check('reset re-gates push', isDeny(gate('git push', { prompt_id: 'rr' })));
+
+console.log('-- graduation hint only appears for already-taught commands --');
+resetState({ taught: ['push'] });
+check('hint shown once taught', /gh-tutor ungate push/.test(denyReason(gate('git push', { prompt_id: 'h1' }))));
+
+resetState({ taught: [] });
+check('no hint on first exposure', !/ungate/.test(denyReason(gate('git merge main', { prompt_id: 'h2' }))));
 
 console.log('-- activate: announces only when enabled --');
 resetState();

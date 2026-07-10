@@ -1,6 +1,6 @@
 ---
-description: Toggle the git/GitHub tutor, its verbosity, and classroom quiz mode
-argument-hint: "[on|off|verbose|brief|classroom on|classroom off|reset]"
+description: Toggle the git/GitHub tutor, its verbosity, classroom quiz mode, and per-command gating
+argument-hint: "[on|off|verbose|brief|classroom on|classroom off|ungate <cmd>|gate <cmd>|reset]"
 ---
 
 Show the user the current github-tutor state and the available toggles.

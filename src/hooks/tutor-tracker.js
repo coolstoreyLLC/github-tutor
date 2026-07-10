@@ -7,6 +7,8 @@
 // blocked and the confirmation shown directly to the user.
 
 const { readState, writeState, DEFAULTS } = require('./tutor-config');
+const { canonicalKey, gateableKeys } = require('./classify');
+const { LESSONS } = require('./lessons');
 
 function block(reason) {
   process.stdout.write(JSON.stringify({ decision: 'block', reason }));
@@ -19,19 +21,53 @@ function passthrough() {
 
 function statusCard(s) {
   const onoff = v => (v ? 'on' : 'off');
+  const list = a => (a.length ? a.join(', ') : '—');
   return [
     'github-tutor',
     '',
     `  tutor      ${onoff(s.enabled)}${s.enabled ? '' : '   (Claude runs git commands normally)'}`,
     `  verbosity  ${s.verbosity}`,
     `  classroom  ${onoff(s.classroom)}${s.classroom ? '   (quizzes on commands you have seen before)' : ''}`,
-    `  learned    ${s.taught.length} command${s.taught.length === 1 ? '' : 's'}${s.taught.length ? ': ' + s.taught.join(', ') : ''}`,
+    `  taught     ${list(s.taught)}`,
+    `  ungated    ${list(s.ungated)}${s.ungated.length ? '   (Claude runs these for you)' : ''}`,
     '',
-    '  /gh-tutor on | off            gate git commands, or let Claude run them',
-    '  /gh-tutor verbose | brief     how much explanation you get',
-    '  /gh-tutor classroom on | off  quiz before revealing a known command',
-    '  /gh-tutor reset               forget what you have been taught',
+    '  /gh-tutor on | off              gate git commands, or let Claude run them',
+    '  /gh-tutor verbose | brief       how much explanation you get',
+    '  /gh-tutor classroom on | off    quiz before revealing a known command',
+    '  /gh-tutor ungate <command>      you know this one — let Claude run it',
+    '  /gh-tutor gate <command>        teach me this one again',
+    '  /gh-tutor reset                 back to defaults, re-gate everything',
   ].join('\n');
+}
+
+// Ungating is the graduation path: the tutor should shrink as the user learns.
+function ungate(s, raw) {
+  const key = canonicalKey(raw);
+  if (!key) {
+    block(`"${raw}" is not a command the tutor gates.\n\nGateable git commands:\n  ${gateableKeys().join(' ')}\n\ngh commands look like: gh-pr-create, gh-repo-fork\n\nRead-only commands (status, log, diff) are never gated, so there is nothing to ungate.`);
+  }
+  if (s.ungated.includes(key)) block(`\`${key}\` is already ungated. Claude runs it for you.`);
+
+  writeState({ ...s, ungated: [...s.ungated, key] });
+
+  const L = LESSONS[key];
+  const lines = [`Ungated \`${key}\`. Claude will now run it for you without explaining. Everything else stays gated.`];
+  if (L && L.danger) {
+    lines.push('');
+    lines.push(`Worth knowing what you just handed over: ${L.danger}`);
+  }
+  lines.push('');
+  lines.push(`Changed your mind? \`/gh-tutor gate ${key}\``);
+  block(lines.join('\n'));
+}
+
+function regate(s, raw) {
+  const key = canonicalKey(raw);
+  if (!key) block(`"${raw}" is not a command the tutor gates.\n\nGateable git commands:\n  ${gateableKeys().join(' ')}`);
+  if (!s.ungated.includes(key)) block(`\`${key}\` is already gated — Claude explains it and hands it to you.`);
+
+  writeState({ ...s, ungated: s.ungated.filter(k => k !== key) });
+  block(`Gated \`${key}\` again. Claude will explain it and hand it to you to type.`);
 }
 
 let input = '';
@@ -77,9 +113,21 @@ process.stdin.on('end', () => {
           ? 'Classroom mode ON. You will be quizzed before commands you have already been taught. Answer, or say "skip" / "tell me".'
           : 'Classroom mode OFF. No quizzes.');
       }
+      // `/gh-tutor ungate git push` — everything after the verb is the command,
+      // so both "push" and "git push" work.
+      if (a === 'ungate' || a === 'learned' || a === 'skip') {
+        const rest = args.slice(1).join(' ');
+        if (!rest) block(`Which command? e.g. \`/gh-tutor ungate push\`\n\n${statusCard(s)}`);
+        ungate(s, rest);
+      }
+      if (a === 'gate' || a === 'relearn' || a === 'teach') {
+        const rest = args.slice(1).join(' ');
+        if (!rest) block(`Which command? e.g. \`/gh-tutor gate push\`\n\n${statusCard(s)}`);
+        regate(s, rest);
+      }
       if (a === 'reset') {
         writeState({ ...DEFAULTS });
-        block('github-tutor reset to defaults. Learned-command history cleared.');
+        block('github-tutor reset to defaults. Learned-command history cleared, everything re-gated.');
       }
       if (a === 'status') block(statusCard(s));
 

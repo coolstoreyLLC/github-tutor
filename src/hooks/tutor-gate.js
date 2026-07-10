@@ -106,6 +106,13 @@ function buildReason(command, key, state) {
   lines.push('- If the user says they are in a hurry, tell them: `/gh-tutor off` disables the tutor and you will run git commands normally again.');
   lines.push('- Read-only git (status, log, diff) is never blocked — use it freely to ground your explanation in what is actually true right now.');
 
+  // Only offer the graduation path once they have actually met this command.
+  // Dangling an escape hatch on first exposure teaches them to skip the lesson.
+  if (state.taught.includes(key)) {
+    lines.push('');
+    lines.push(`If the user says they already know this one, or sounds impatient with it specifically, mention: \`/gh-tutor ungate ${key}\` retires the lesson and lets you run \`${key}\` normally from now on. Everything else stays gated. Mention it once, not every time.`);
+  }
+
   return lines.filter(l => l !== undefined).join('\n');
 }
 
@@ -135,6 +142,9 @@ process.stdin.on('end', () => {
 
     const key = classify(command);
     if (!key) allow();
+
+    // Graduated: the user told us they know this one. Run it like any other command.
+    if (state.ungated.includes(key)) allow();
 
     // One-shot pass: same command, different prompt → the user is running it.
     const promptId = data.prompt_id || data.session_id || null;
