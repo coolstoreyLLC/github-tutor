@@ -1,0 +1,46 @@
+{
+  "name": "github-tutor",
+  "description": "A git/GitHub tutor sitting beside you at the keyboard. Claude keeps doing the coding; git commands get explained and handed to you to type. Toggleable, with verbose/brief modes and an optional classroom quiz mode.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Simon Griffith"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/tutor-activate.js\"",
+            "timeout": 5,
+            "statusMessage": "Loading github-tutor..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/tutor-tracker.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hooks/tutor-gate.js\"",
+            "timeout": 10,
+            "statusMessage": "github-tutor checking command..."
+          }
+        ]
+      }
+    ]
+  }
+}

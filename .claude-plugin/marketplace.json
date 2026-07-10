@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "github-tutor",
+  "description": "Learn git and GitHub while Claude Code does everything else.",
+  "owner": {
+    "name": "Simon Griffith"
+  },
+  "plugins": [
+    {
+      "name": "github-tutor",
+      "description": "A git tutor over your shoulder. Claude explains every git command, then you type it.",
+      "source": "./",
+      "category": "learning"
+    }
+  ]
+}
